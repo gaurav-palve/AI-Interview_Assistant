@@ -1,30 +1,23 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.prompts import PromptTemplate
-from PyPDF2 import PdfReader
+from langchain_core.messages import HumanMessage
 from config.settings import settings
+from utils.logger import logger
 
 llm = ChatGoogleGenerativeAI(
-        model="gemini-2.0-flash",
-        model_provider="google_genai",
-        temperature=0.3,
-        google_api_key=settings.GEMINI_API_KEY
-    )
+    model="gemini-2.0-flash",
+    temperature=0.3,
+    google_api_key=settings.GEMINI_API_KEY
+)
 
-def extract_text_from_pdf(pdf_path):
-    reader = PdfReader(pdf_path)
-    text = ""
-    for page in reader.pages:
-        text += page.extract_text()
-    return text
-
-def generate_mcqs(jd_path, resume_path):
-    jd_text = extract_text_from_pdf(jd_path)
-    resume_text = extract_text_from_pdf(resume_path)
-
+def generate_mcqs(jd_text: str, resume_text: str) -> str:
+    logger.debug("Generating MCQs with extracted JD and Resume text.")
+    
     prompt = PromptTemplate(
         input_variables=["jd", "resume"],
-        template='''Based on the following job description and resume, generate 5 multiple-choice technical questions relevant to the job role.
-        
+        template='''
+Based on the following job description and resume, generate 5 multiple-choice technical questions relevant to the job role.
+
 Job Description:
 {jd}
 
@@ -40,6 +33,12 @@ List the MCQs in the following format:
 Answer: b) Option2
 '''
     )
-    full_prompt = prompt.format(jd=jd_text, resume=resume_text)
-    result = llm(full_prompt)
-    return result
+
+    formatted_prompt = prompt.format(jd=jd_text, resume=resume_text)
+    messages = [HumanMessage(content=formatted_prompt)]
+
+    logger.debug("Sending prompt to Gemini model.")
+    response = llm(messages)
+    logger.debug("Received response from Gemini model.")
+
+    return response.content
