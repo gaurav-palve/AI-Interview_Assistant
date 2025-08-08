@@ -1,12 +1,12 @@
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from agents.mcq_agent import generate_mcqs
-import shutil
-import os
+from controllers.interview_controller import handle_interview
+from utils.logger import logger
+from routes import files
 
 app = FastAPI()
 
-# Allow CORS for frontend
+# Enable CORS for frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -14,20 +14,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-UPLOAD_DIR = "uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-
 @app.post("/upload/")
-async def upload_files(jd: UploadFile = File(...), resume: UploadFile = File(...)):
-    jd_path = os.path.join(UPLOAD_DIR, jd.filename)
-    resume_path = os.path.join(UPLOAD_DIR, resume.filename)
+async def upload_and_generate(jd: UploadFile = File(...), resume: UploadFile = File(...)):
+    logger.info(f"Received upload request: JD={jd.filename}, Resume={resume.filename}")
+    return await handle_interview(jd, resume)
 
-    with open(jd_path, "wb") as buffer:
-        shutil.copyfileobj(jd.file, buffer)
 
-    with open(resume_path, "wb") as buffer:
-        shutil.copyfileobj(resume.file, buffer)
-
-    # Call MCQ generation agent
-    mcqs = generate_mcqs(jd_path, resume_path)
-    return {"mcqs": mcqs}
+app.include_router(files.router, prefix="/files", tags=["Files"])
